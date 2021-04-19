@@ -16,3 +16,19 @@ is split up and distributed across multiple nodes for more rapid execution.
 
 # Usage
 
+```
+    Usage:
+
+    nextflow run FredHutch/cellprofiler-batch-nf <ARGUMENTS>
+    
+    Required Arguments:
+      --input               Batch file created by the CellProfiler GUI interface
+
+    Optional Arguments:
+      --n                   Number of images to analyze in each batch (default: 1000)
+      --version             Software version CellProfiler (default: 4.1.3)
+                            Must correspond to tag available at hub.docker.com/r/cellprofiler/cellprofiler/tags
+
+    CellProfiler Citations: See https://cellprofiler.org/citations
+    Workflow: https://github.com/FredHutch/cellprofiler-batch-nf
+```
