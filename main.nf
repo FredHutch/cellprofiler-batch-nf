@@ -89,7 +89,7 @@ cmd_list = []
 for start_ix in range(1, df.shape[0] + 1, batch_size):
 
   # Get the end position
-  end_ix = min(df.shape[0], start_x + batch_size - 1)
+  end_ix = min(df.shape[0], start_ix + batch_size - 1)
 
   # Format the command to run
   cmd_list.append(
