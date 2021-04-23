@@ -60,7 +60,7 @@ workflow {
     Channel
         .fromPath(params.input_txt)
         .splitText()
-        .map({ i -> file(i) })
+        .map({ i -> file(i.trim()) })
         .collate(params.n)
         .set { img_list_ch }
 
