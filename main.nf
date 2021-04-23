@@ -64,11 +64,13 @@ workflow {
         .collate(params.n)
         .set { img_list_ch }
 
-    // For each of those batches, run the indicated analysis
-    CellProfiler(
-      img_list_ch,
-      input_h5
-    )
+    img_list_ch.view()
+
+    // // For each of those batches, run the indicated analysis
+    // CellProfiler(
+    //   img_list_ch,
+    //   input_h5
+    // )
 
 }
 
