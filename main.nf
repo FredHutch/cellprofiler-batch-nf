@@ -99,7 +99,7 @@ for start_ix in range(1, df.shape[0] + 1, batch_size):
 # Write out the command to a file
 with open("cellprofiler.commands.txt", "w") as handle:
 
-    handle.write("\n".join(cmd_list))
+    handle.write("\\n".join(cmd_list))
 
   """
 }
