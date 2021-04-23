@@ -50,56 +50,42 @@ workflow {
         exit 0
     }
 
-    // Point to the input files
-    input_txt = file(params.input_txt)
+    // Point to the input file for the workflow
     input_h5 = file(params.input_h5)
 
-    // Based on the number of images provided, format the commands to execute
-    parseInputs(
-      input_txt
+    // Split up the list of input files
+    // map the file on each line to a file object
+    // group into batches of size --n
+    // assign the channel to img_list_ch
+    Channel
+        .fromPath(params.input_txt)
+        .splitText()
+        .map({ i -> file(i) })
+        .collate(params.n)
+        .set( img_list_ch )
+
+    // For each of those batches, run the indicated analysis
+    CellProfiler(
+      img_list_ch,
+      input_h5
     )
 
 }
 
-process parseInputs {
-  container "quay.io/fhcrc-microbiome/python-pandas:latest"
+process CellProfiler {
+  container "cellprofiler/cellprofiler:${params.version}"
 
   input:
-    file input_txt
+    file "input/*"
+    file analysis_h5
 
   output:
-    file "cellprofiler.commands.txt"
+    file "output/*"
 
-  """#!/usr/bin/env python3
+  """#!/bin/bash
 
-import pandas as pd
-
-# Read in the file with the list of images to process
-df = pd.read_csv("${input_txt}")
-
-# Get the number of images to include in each batch
-batch_size = int(${params.n})
-
-assert batch_size > 0
-
-# Keep a list of commands
-cmd_list = []
-
-# Iterate over the (1-based) index position each batch of images
-for start_ix in range(1, df.shape[0] + 1, batch_size):
-
-  # Get the end position
-  end_ix = min(df.shape[0], start_ix + batch_size - 1)
-
-  # Format the command to run
-  cmd_list.append(
-    f"cellprofiler -f {start_ix} -l {end_ix}"
-  )
-
-# Write out the command to a file
-with open("cellprofiler.commands.txt", "w") as handle:
-
-    handle.write("\\n".join(cmd_list))
+# Run CellProfiler on this batch of images
+cellprofiler -c -o output/ -i input/ ${analysis_h5}
 
   """
 }
