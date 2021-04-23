@@ -62,7 +62,7 @@ workflow {
         .splitText()
         .map({ i -> file(i) })
         .collate(params.n)
-        .set( img_list_ch )
+        .set { img_list_ch }
 
     // For each of those batches, run the indicated analysis
     CellProfiler(
