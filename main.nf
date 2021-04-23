@@ -85,7 +85,7 @@ process CellProfiler {
   """#!/bin/bash
 
 # Run CellProfiler on this batch of images
-cellprofiler -c -o output/ -i input/ ${analysis_h5}
+cellprofiler -c -o output/ -i input/ -p ${analysis_h5} output/OUTPUT
 
   """
 }
