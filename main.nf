@@ -75,7 +75,7 @@ process parseInputs {
 import pandas as pd
 
 # Read in the file with the list of images to process
-df = pd.read-csv("${input_txt}")
+df = pd.read_csv("${input_txt}")
 
 # Get the number of images to include in each batch
 batch_size = int(${params.n})
