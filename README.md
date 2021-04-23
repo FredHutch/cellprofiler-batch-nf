@@ -22,7 +22,9 @@ is split up and distributed across multiple nodes for more rapid execution.
     nextflow run FredHutch/cellprofiler-batch-nf <ARGUMENTS>
     
     Required Arguments:
-      --input               Batch file created by the CellProfiler GUI interface
+      --input_h5            Batch file created by the CellProfiler GUI interface defining the analysis to run
+      --input_txt           List of images to process using the specified analysis
+      --output              Path to output directory
 
     Optional Arguments:
       --n                   Number of images to analyze in each batch (default: 1000)
