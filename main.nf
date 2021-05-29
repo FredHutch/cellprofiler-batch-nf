@@ -114,6 +114,7 @@ process CellProfiler {
     file "output/*"
 
   """#!/bin/bash
+mkdir -p output
 
 # Run CellProfiler on this batch of images
 cellprofiler -r -c -o output/ -i input/ -p ${analysis_h5} output/OUTPUT
@@ -129,18 +130,30 @@ rm \$REMOVE_FILE
 # Get the name of the input image file
 export INPUTFILE="\$(ls input/* | head -n 1)"
 export INPUTFILEBASE="\$(basename \$INPUTFILE)"
-echo "input base is \$INPUTFILEBASE ."
 
-# For all files in the output, add the image name as an additional column
+
+# For all files in the output:
+   * add the image name as the first column
+   * remove the ImageNumber column if it exists
 # Note: the files are renamed to hardcoded temporary files for simplicity
 for f in output/* ; do 
     # remove carriage returns that are sometimes present
     cat \$f | tr -d '\\r' > output/tmptrimfile
-    # add the image name & a header column
-    awk -v f=\$INPUTFILEBASE 'NR==1 {printf("%s\\t%s\\n", \$0, "ImageName")}  NR>1 && NF > 0 { printf("%s\\t%s\\n", \$0, f) }' output/tmptrimfile > output/tmpcopyfile
+    # remove the ImageNumber column if it exists
+    imagenumbercol="\$(head -1 output/tmptrimfile | tr '\\t' '\\n' | cat -n | grep 'ImageNumber' | awk '{print \$1}')"
+    if [[ ! -z "\$imagenumbercol" ]]
+    then
+        cut --complement -f\$imagenumbercol output/tmptrimfile > output/tmpcolfile
+    else
+        cp output/tmptrimfile output/tmpcolfile
+    fi
+    # add the image name column w/ header
+    awk -v f=\$INPUTFILEBASE 'NR==1 {printf("%s\\t%s\\n", "ImageName", \$0)}  NR>1 && NF > 0 { printf("%s\\t%s\\n", f, \$0) }' output/tmpcolfile > output/tmpcopyfile
     cp output/tmpcopyfile \$f
     rm -f output/tmpcopyfile
     rm -f output/tmptrimfile
+    rm -f output/tmpcolfile
+    unset imagenumbercol
 done
   """
 }
@@ -158,8 +171,6 @@ process ConcatFiles_Round1 {
     file "$filename"
 
   """#!/bin/bash
-mkdir -p output
-
 # first, save the header
 FIRSTFILE="\$(ls input*/* | head -n 1)"
 head -n 1 \$FIRSTFILE > $filename
@@ -171,7 +182,8 @@ awk 'FNR>1' input*/* >> $filename
 
 process ConcatFiles_Round2 {
   container "cellprofiler/cellprofiler:${params.version}"
-  publishDir path: params.output
+  // mode: copy because the default is symlink to /fh/scratch/ (i.e. ephemeral)
+  publishDir path: params.output , mode: 'copy'
   label 'mem_medium'
   errorStrategy 'retry'
   maxRetries 3 //slurm tends to SIGTERM jobs
@@ -183,13 +195,11 @@ process ConcatFiles_Round2 {
     file "$filename"
 
   """#!/bin/bash
-mkdir -p output
-
 # first, save the header
 FIRSTFILE="\$(ls input*/* | head -n 1)"
 head -n 1 \$FIRSTFILE > $filename
 
 # now concatenate all of the files, skipping the first row
-awk 'FNR>1' input*/* >> $filename
+awk 'FNR>1' input*/* | sort -n >> $filename
   """
 }
