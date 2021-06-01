@@ -9,7 +9,7 @@ params.input_h5 = false
 params.input_txt = false
 params.output = false
 params.n = 1
-params.reduce_n = 100
+params.concat_n = 100
 params.version = "4.1.3"
 
 // Docker containers reused across processes
@@ -31,7 +31,7 @@ def helpMessage() {
 
     Optional Arguments:
       --n                   Number of images to analyze in each batch (default: 1000)
-      --reduce_n            Number of tabular results to combine/concatenate in the first round (default: 100)
+      --concat_n            Number of tabular results to combine/concatenate in the first round (default: 100)
       --version             Software version CellProfiler (default: 4.1.3)
                             Must correspond to tag available at hub.docker.com/r/cellprofiler/cellprofiler/tags
 
@@ -78,7 +78,7 @@ workflow {
     profiler_results_ch = CellProfiler.out
         .flatten()
         .map({ i -> [ i.name, i ]})
-        .groupTuple(size: params.reduce_n , remainder: true)
+        .groupTuple(size: params.concat_n , remainder: true)
 
     // For each group of files, concatenate them together
     ConcatFiles_Round1(
@@ -102,9 +102,6 @@ workflow {
 process CellProfiler {
   container "cellprofiler/cellprofiler:${params.version}"
   label 'mem_veryhigh'
-  maxForks 100
-  errorStrategy 'retry'
-  maxRetries 3 //slurm tends to SIGTERM jobs
 
   input:
     file "input/*"
@@ -150,9 +147,7 @@ for f in output/* ; do
     # add the image name column w/ header
     awk -v f=\$INPUTFILEBASE 'NR==1 {printf("%s\\t%s\\n", "ImageName", \$0)}  NR>1 && NF > 0 { printf("%s\\t%s\\n", f, \$0) }' output/tmpcolfile > output/tmpcopyfile
     cp output/tmpcopyfile \$f
-    rm -f output/tmpcopyfile
-    rm -f output/tmptrimfile
-    rm -f output/tmpcolfile
+    rm -f output/tmpcopyfile output/tmptrimfile output/tmpcolfile
     unset imagenumbercol
 done
   """
@@ -161,11 +156,9 @@ done
 process ConcatFiles_Round1 {
   container "cellprofiler/cellprofiler:${params.version}"
   label 'mem_medium'
-  errorStrategy 'retry'
-  maxRetries 3 //slurm tends to SIGTERM jobs
 
   input:
-    tuple val(filename), path("input???/*")
+    tuple val(filename), path("input*/*")
 
   output:
     file "$filename"
@@ -185,11 +178,9 @@ process ConcatFiles_Round2 {
   // mode: copy because the default is symlink to /fh/scratch/ (i.e. ephemeral)
   publishDir path: params.output , mode: 'copy'
   label 'mem_medium'
-  errorStrategy 'retry'
-  maxRetries 3 //slurm tends to SIGTERM jobs
 
   input:
-    tuple val(filename), path("input??/*")
+    tuple val(filename), path("input*/*")
 
   output:
     file "$filename"
