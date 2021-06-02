@@ -39,34 +39,32 @@ Here's an example of how to run this workflow, in six steps. This example is des
 1. Make/find a source folder. Put the images there.
 
 ```bash
-mkdir -p /fh/scratch/delete30/EXAMPLE_PI/EXAMPLE_IMAGES/
+mkdir -p WORK_DIR/EXAMPLE_IMAGES/
 ```
 
 2. Make the output folder. This is where the workflow results will go.
 
 ```bash
-mkdir -p /fh/scratch/delete30/EXAMPLE_PI/EXAMPLE_OUTPUT/
+mkdir -p WORK_DIR/EXAMPLE_OUTPUT/
 ```
 
 3. Make a 'project' folder to put the workflow & code. 
   * Put your project file (a `.cppipe` file) there. This file is created by using the CellProfiler app, usually on your desktop/laptop. 
-  * Put the `nextflow.config` file there.
-  * Put the `main.nf` file there.
 
 ```bash
-mkdir -p /fh/fast/EXAMPLE_PI/EXAMPLE_PROJECT/
+mkdir -p WORK_DIR/EXAMPLE_PROJECT/
 ```
 
-4. Make a list of image files to run. For example, let's say we want to process all the `.tif` images in the source folder. We'll get the list of files, and put them into a text file. This will be used by the workflow.
+4. Make a file with a list of images to run. For example, let's say we want to process all the `.tif` images in the source folder. We'll get the list of files, and put them into a text file in the project folder. This will be used by the workflow.
 
 ```bash
-cd /fh/fast/EXAMPLE_PI/EXAMPLE_PROJECT/
-ls /fh/scratch/delete30/EXAMPLE_PI/EXAMPLE_IMAGES/*tif > filelist.txt
+cd WORK_DIR/EXAMPLE_PROJECT/
+ls WORK_DIR/EXAMPLE_IMAGES/*tif > filelist.txt
 ```
 
-5. Make a 'run' script. This has all of the variables needed to run Nextflow. It also makes reproducibility easy: you just re-run the run script.
+5. Make a 'run' script. This has all of the variables needed to run Nextflow. It also makes reproducibility easy: just re-run the script.
 
-Here's an example run script, which we'll call `run.sh`. Save it to the project folder (e.g. `/fh/fast/EXAMPLE_PI/EXAMPLE_PROJECT/`)
+Here's an example run script, which we'll call `run.sh`. Save it to the project folder (e.g. `WORK_DIR/EXAMPLE_PROJECT/`)
 
 ```bash
 #!/bin/bash
@@ -78,29 +76,18 @@ INPUT_CONCAT_N=100
 
 #OUTPUT
 PROJECT=EXAMPLE_PROJECT
-OUTPUT_DIR=/fh/scratch/delete30/EXAMPLE_PI/EXAMPLE_OUTPUT/
-
-# Configuration, saved to /fh/fast/_SR/DataApplications/assets/nextflow/
-NXF_CONFIG=/fh/fast/_SR/DataApplications/assets/nextflow/nextflow.singularity.config
+OUTPUT_DIR=WORK_DIR/EXAMPLE_OUTPUT/
 
 # Profile (used to allocate resources)
 PROFILE=standard
-
-# Load singularity
-ml Singularity
-export PATH=$SINGULARITYROOT/bin/:$PATH
-
-# Load nextflow
-ml nextflow
 
 # Run the workflow
 NXF_VER=20.10.0 \
 nextflow \
     run \
-    -c $NXF_CONFIG \
     -c nextflow.config \
     -profile $PROFILE \
-    main.nf \
+    FredHutch/cellprofiler-batch-nf \
     --input_h5 "${INPUT_H5}" \
     --input_txt "${INPUT_TXT}" \
     --output ${OUTPUT_DIR} \
@@ -111,13 +98,44 @@ nextflow \
 
 ```
 
-There's a lot there. The script is creating bash variables for the workflow parameters, loading the `nextflow` module, and then running the Nextflow workflow.
+The script is creating bash variables for the workflow parameters and then running the Nextflow workflow.
 
 6. Finally, run the script.
 
 ```bash
-cd /fh/fast/EXAMPLE_PI/EXAMPLE_PROJECT/
+cd WORK_DIR/EXAMPLE_PROJECT/
 . run.sh
 ```
 
 The script will run and put the output in the output folder/directory. In testing, processing ~480 images took 10-18 minutes.
+
+
+
+### Using Multiple Configs
+
+If you have a Nextflow config file that is used to execute workflows in your environment, Nextflow [can combine it](https://www.nextflow.io/docs/latest/config.html) with the GitHub repo's `nextflow.config`. 
+
+For example, let's say you have a `default.nextflow.config` file that is used to run in your environment (e.g. to support AWS Batch, or Slurm, or Singularity). You'd update the script to include a `BASE_CONFIG` variable, and update the `nextflow run` command parameters to include it.
+
+
+```bash
+
+BASE_CONFIG=WORK_DIR/default.nextflow.config
+
+# Run the workflow
+NXF_VER=20.10.0 \
+nextflow \
+    run \
+    -c $BASE_CONFIG \
+    -c nextflow.config \
+    -profile $PROFILE \
+    FredHutch/cellprofiler-batch-nf \
+    --input_h5 "${INPUT_H5}" \
+    --input_txt "${INPUT_TXT}" \
+    --output ${OUTPUT_DIR} \
+    -with-report $PROJECT.report.html \
+    -with-trace $PROJECT.trace.tsv \
+    -resume \
+    -latest
+
+```
