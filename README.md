@@ -34,7 +34,7 @@ When this workflow is run on that batch file, the analyses specified by the user
 
 ## Example
 
-Here's an example of how to run this workflow, in six steps. This example is designed to be run on Rhino.
+Here's an example of how to run this workflow, in six steps.
 
 1. Make/find a source folder. Put the images there.
 
