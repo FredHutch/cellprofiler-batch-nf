@@ -85,7 +85,6 @@ PROFILE=standard
 NXF_VER=20.10.0 \
 nextflow \
     run \
-    -c nextflow.config \
     -profile $PROFILE \
     FredHutch/cellprofiler-batch-nf \
     --input_h5 "${INPUT_H5}" \
@@ -104,7 +103,7 @@ The script is creating bash variables for the workflow parameters and then runni
 
 ```bash
 cd WORK_DIR/EXAMPLE_PROJECT/
-. run.sh
+bash run.sh
 ```
 
 The script will run and put the output in the output folder/directory. In testing, processing ~480 images took 10-18 minutes.
@@ -127,7 +126,6 @@ NXF_VER=20.10.0 \
 nextflow \
     run \
     -c $BASE_CONFIG \
-    -c nextflow.config \
     -profile $PROFILE \
     FredHutch/cellprofiler-batch-nf \
     --input_h5 "${INPUT_H5}" \
