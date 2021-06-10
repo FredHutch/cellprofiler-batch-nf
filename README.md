@@ -137,3 +137,8 @@ nextflow \
     -latest
 
 ```
+
+
+## CellProfiler pipelines
+
+The workflow requires a CellProfiler pipeline (`.cppipe`) file. This can be created from a project by going to *File -> Export -> Pipeline*. See the [CellProfiler manual](https://cellprofiler-manual.s3.amazonaws.com/CellProfiler-4.1.3/help/projects_introduction.html?highlight=cppipe#) for details. Look for the 'Saving a project' section.
