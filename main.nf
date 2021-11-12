@@ -75,7 +75,7 @@ workflow {
     // Take the resulting files, split & group them by name
     // Use the size and remainder arguments in groupTuple()
     // to control the size of the inputs to the concat() process
-    profiler_results_ch = CellProfiler.out
+    profiler_results_ch = CellProfiler.out.txt
         .flatten()
         .map({ i -> [ i.name, i ]})
         .groupTuple(size: params.concat_n , remainder: true)
@@ -102,13 +102,15 @@ workflow {
 process CellProfiler {
   container "cellprofiler/cellprofiler:${params.version}"
   label 'mem_veryhigh'
+  publishDir path: "${params.output}/tiff/" , mode: 'copy', pattern: "output/*.tiff"
 
   input:
     file "input/*"
     file analysis_h5
 
   output:
-    file "output/*"
+    file "output/*.tiff", emit: tiff
+    file "output/*.txt", emit: txt
 
   """#!/bin/bash
 mkdir -p output
@@ -133,7 +135,7 @@ export INPUTFILEBASE="\$(basename \$INPUTFILE)"
    * add the image name as the first column
    * remove the ImageNumber column if it exists
 # Note: the files are renamed to hardcoded temporary files for simplicity
-for f in output/* ; do 
+for f in output/*.txt ; do 
     # remove carriage returns that are sometimes present
     cat \$f | tr -d '\\r' > output/tmptrimfile
     # remove the ImageNumber column if it exists
