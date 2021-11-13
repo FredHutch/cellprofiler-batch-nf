@@ -105,12 +105,12 @@ process CellProfiler {
   publishDir path: "${params.output}/tiff/" , mode: 'copy', pattern: "output/*.tiff"
 
   input:
-    file "input/*"
-    file analysis_h5
+    path "input/*"
+    path analysis_h5
 
   output:
-    file "output/*.tiff", emit: tiff
-    file "output/*.txt", emit: txt
+    path "output/*.tiff", emit: tiff
+    path "output/*.txt", emit: txt
 
   """#!/bin/bash
 mkdir -p output
@@ -163,7 +163,7 @@ process ConcatFiles_Round1 {
     tuple val(filename), path("input*/*")
 
   output:
-    file "$filename"
+    path "$filename"
 
   """#!/bin/bash
 # first, save the header
@@ -185,7 +185,7 @@ process ConcatFiles_Round2 {
     tuple val(filename), path("input*/*")
 
   output:
-    file "$filename"
+    path "$filename"
 
   """#!/bin/bash
 # first, save the header
