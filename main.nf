@@ -6,11 +6,18 @@ nextflow.enable.dsl=2
 // Set default parameters
 params.help = false
 params.input_h5 = false
-params.input_txt = false
+params.input_csv = false
 params.output = false
-params.n = 1
+params.n = 1000
 params.concat_n = 100
+params.group_col = 'Group_Number'
+params.folder_col = 'PathName_Orig'
+params.file_col = 'FileName_Orig'
+params.shard_col = "Shard_Id"
+params.file_prefix_in = ""
+params.file_prefix_out = "" //update docs on how to use this in FH environment
 params.version = "4.1.3"
+
 
 // Docker containers reused across processes
 container__cellprofiler = "cellprofiler/cellprofiler:${params.version}"
@@ -26,7 +33,7 @@ def helpMessage() {
 
     Required Arguments:
       --input_h5            Batch file created by the CellProfiler GUI interface defining the analysis to run
-      --input_txt           List of images to process using the specified analysis
+      --input_csv           CSV file containing the parameters + groupings for this run
       --output              Path to output directory
 
     Optional Arguments:
@@ -34,6 +41,13 @@ def helpMessage() {
       --concat_n            Number of tabular results to combine/concatenate in the first round (default: 100)
       --version             Software version CellProfiler (default: 4.1.3)
                             Must correspond to tag available at hub.docker.com/r/cellprofiler/cellprofiler/tags
+      --group_col           The name of the grouping column in the CSV file (default: Group_Number)
+      --folder_col          The name of the folder column in the CSV file (default: PathName_Orig)
+      --file_col            The name of the file column in the CSV file (default: FileName_Orig)
+      --shard_col           The name of the column being added that has the shard (default: Shard_Id)
+      --file_prefix_in      
+      --file_prefix_out     
+
 
     CellProfiler Citations: See https://cellprofiler.org/citations
     Workflow: https://github.com/FredHutch/cellprofiler-batch-nf
@@ -45,7 +59,7 @@ def helpMessage() {
 workflow {
 
     // Show help message if the user specifies the --help flag at runtime
-    if (params.help || !params.input_h5 || !params.input_txt || !params.output){
+    if (params.help || !params.input_h5 || !params.input_csv || !params.output) {
         // Invoke the function above which prints the help message
         helpMessage()
         // Exit out and do not run anything else
@@ -55,20 +69,35 @@ workflow {
     // Point to the input file for the workflow
     input_h5 = file(params.input_h5)
 
-    // Split up the list of input files
-    // map the file on each line to a file object
-    // group into batches of size --n
-    // assign the channel to img_list_ch
-    Channel
-        .fromPath(params.input_txt)
-        .splitText()
-        .map({ i -> file(i.trim()) })
-        .collate(params.n)
-        .set { img_list_ch }
+    // Point to the input CSV for the workflow
+    input_csv = file(params.input_csv)
 
-    // For each of those batches, run the indicated analysis
+    ParseCsv(
+      input_csv
+    )
+
+    // Get the list of files per shard and associate them with a tuple
+    files_by_shard = parse_csv.out
+      .flatMap()
+      .splitCsv(header: true)
+      .map { it -> [it.Shard_Id, file( it.Wf_Image_Path )] }
+      .groupTuple()
+      //.view()
+
+    // Get the csv file for each shard and associate it with a tuple
+    csv_by_shard = parse_csv.out
+      .flatMap()
+      .map { it -> [file(it).getName().replace('.csv',''), file(it)] }
+      .groupTuple()
+      //.view()
+
+    // Join the CSV and files together
+    csv_and_files = files_by_shard.join(csv_by_shard)
+      .view()
+
+    // For each of those batches/shards, run the indicated analysis
     CellProfiler(
-      img_list_ch,
+      csv_and_files,
       input_h5
     )
 
@@ -99,13 +128,31 @@ workflow {
 
 }
 
+
+process ParseCsv {
+  container "$container__pandas"
+  echo true
+  publishDir path: output_dir , mode: 'copy'
+
+  input:
+    path("*"), stageAs: "input/*"
+
+  output:
+    path("*.csv")
+    //name them by group number
+
+  script:
+  template 'test.py'
+}
+
+
 process CellProfiler {
   container "cellprofiler/cellprofiler:${params.version}"
   label 'mem_veryhigh'
   publishDir path: "${params.output}/tiff/" , mode: 'copy', pattern: "output/*.tiff"
 
   input:
-    path "input/*"
+    tuple val(shard_id), path("*"), path("*")
     path analysis_h5
 
   output:
