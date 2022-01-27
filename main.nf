@@ -45,9 +45,10 @@ def helpMessage() {
       --folder_col          The name of the folder column in the CSV file (default: PathName_Orig)
       --file_col            The name of the file column in the CSV file (default: FileName_Orig)
       --shard_col           The name of the column being added that has the shard (default: Shard_Id)
-      --file_prefix_in      
-      --file_prefix_out     
-
+      --file_prefix_in      The value of the folder path prefix, in the folder column of the CSV 
+                               that needs to be changed (no default, ignored when empty)
+      --file_prefix_out     When using --file_prefix_in, set this to be the value of the folder path
+                               to change into
 
     CellProfiler Citations: See https://cellprofiler.org/citations
     Workflow: https://github.com/FredHutch/cellprofiler-batch-nf
@@ -77,7 +78,7 @@ workflow {
     )
 
     // Get the list of files per shard and associate them with a tuple
-    files_by_shard = parse_csv.out
+    files_by_shard = ParseCsv.out
       .flatMap()
       .splitCsv(header: true)
       .map { it -> [it.Shard_Id, file( it.Wf_Image_Path )] }
@@ -85,7 +86,7 @@ workflow {
       //.view()
 
     // Get the csv file for each shard and associate it with a tuple
-    csv_by_shard = parse_csv.out
+    csv_by_shard = ParseCsv.out
       .flatMap()
       .map { it -> [file(it).getName().replace('.csv',''), file(it)] }
       .groupTuple()
@@ -93,7 +94,7 @@ workflow {
 
     // Join the CSV and files together
     csv_and_files = files_by_shard.join(csv_by_shard)
-      .view()
+      //.view()
 
     // For each of those batches/shards, run the indicated analysis
     CellProfiler(
@@ -131,8 +132,8 @@ workflow {
 
 process ParseCsv {
   container "$container__pandas"
-  echo true
-  publishDir path: output_dir , mode: 'copy'
+  label 'io_limited'
+  publishDir path: "${params.output}/csv/" , mode: 'copy', pattern: "*.csv"
 
   input:
     path("*"), stageAs: "input/*"
@@ -142,7 +143,7 @@ process ParseCsv {
     //name them by group number
 
   script:
-  template 'test.py'
+  template 'parse_csv.py'
 }
 
 
@@ -150,9 +151,10 @@ process CellProfiler {
   container "cellprofiler/cellprofiler:${params.version}"
   label 'mem_veryhigh'
   publishDir path: "${params.output}/tiff/" , mode: 'copy', pattern: "output/*.tiff"
+  echo true
 
   input:
-    tuple val(shard_id), path("*"), path("*")
+    tuple val(shard_id), path("input/*"), path("*")
     path analysis_h5
 
   output:
