@@ -11,7 +11,7 @@ file_dir_col = "${params.folder_col}"
 file_col = "${params.file_col}"
 file_prefix_input = "${params.file_prefix_in}"
 file_prefix_output = "${params.file_prefix_out}"
-shard_size = int("${params.n}")
+shard_size = ${params.n}
 shard_col = "${params.shard_col}"
 
 

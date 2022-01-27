@@ -15,7 +15,7 @@ params.folder_col = 'PathName_Orig'
 params.file_col = 'FileName_Orig'
 params.shard_col = "Shard_Id"
 params.file_prefix_in = ""
-params.file_prefix_out = "" //update docs on how to use this in FH environment
+params.file_prefix_out = ""
 params.version = "4.1.3"
 
 
@@ -133,10 +133,10 @@ workflow {
 process ParseCsv {
   container "$container__pandas"
   label 'io_limited'
-  publishDir path: "${params.output}/csv/" , mode: 'copy', pattern: "*.csv"
+  publishDir path: "${params.output}/csv/" , mode: 'copy', pattern: "*.csv", overwrite: true
 
   input:
-    path("*"), stageAs: "input/*"
+    path("input/*")
 
   output:
     path("*.csv")
@@ -150,8 +150,7 @@ process ParseCsv {
 process CellProfiler {
   container "cellprofiler/cellprofiler:${params.version}"
   label 'mem_veryhigh'
-  publishDir path: "${params.output}/tiff/" , mode: 'copy', pattern: "output/*.tiff"
-  echo true
+  publishDir path: "${params.output}/tiff/" , mode: 'copy', pattern: "output/*.tiff", overwrite: true
 
   input:
     tuple val(shard_id), path("input/*"), path("*")
