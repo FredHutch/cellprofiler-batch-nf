@@ -43,7 +43,7 @@ When this workflow is run on that batch file, the analyses specified by the user
 
 ## Example
 
-Here's an example of how to run this workflow, in six steps.
+Here's an example of how to run this workflow, in seven steps.
 
 1. Make/find a source folder. Put the images there.
 
@@ -63,6 +63,15 @@ mkdir -p WORK_DIR/EXAMPLE_OUTPUT/
 ```bash
 mkdir -p WORK_DIR/EXAMPLE_PROJECT/
 ```
+
+You also need to put the `parse_csv.py` script in there, into a `templates` folder:
+
+```bash
+mkdir -p WORK_DIR/EXAMPLE_PROJECT/templates/
+```
+
+Copy the `parse_csv.py` file so it is located at `WORK_DIR/EXAMPLE_PROJECT/templates/parse_csv.py`. You *must* do this, or else the script will not run.
+
 
 4. Make a CSV file with the list of images to run. This is created in CellProfiler.
 
@@ -87,7 +96,7 @@ FILE_PREFIX_OUT="/compute/storage"
 ```
 
 
-5. Make a 'run' script. This has all of the variables needed to run Nextflow. It also makes reproducibility easy: just re-run the script.
+6. Make a 'run' script. This has all of the variables needed to run Nextflow. It also makes reproducibility easy: just re-run the script.
 
 Here's an example run script, which we'll call `run.sh`. Save it to the project folder (e.g. `WORK_DIR/EXAMPLE_PROJECT/`)
 
@@ -129,10 +138,12 @@ nextflow \
     -latest
 
 ```
-
 The script is creating bash variables for the workflow parameters and then running the Nextflow workflow.
 
-6. Finally, run the script.
+
+
+
+7. Finally, run the script.
 
 ```bash
 cd WORK_DIR/EXAMPLE_PROJECT/
