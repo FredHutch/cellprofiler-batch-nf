@@ -153,18 +153,20 @@ process CellProfiler {
   publishDir path: "${params.output}/tiff/" , mode: 'copy', pattern: "output/*.tiff", overwrite: true
 
   input:
-    tuple val(shard_id), path("input/*"), path("*")
+    tuple val(shard_id), path("input/*"), path("shard.csv")
     path analysis_h5
 
   output:
     path "output/*.tiff", emit: tiff
     path "output/*.txt", emit: txt
 
+  script:
   """#!/bin/bash
 mkdir -p output
 
 # Run CellProfiler on this batch of images
-cellprofiler -r -c -o output/ -i input/ -p ${analysis_h5} output/OUTPUT
+cellprofiler -r -c -o output/ -i input/ -p ${analysis_h5} --data-file shard.csv output/OUTPUT
+
 
 # Remove the Experiment file
 # Note: this seems fragile, relying on Experiment.txt. 
@@ -180,8 +182,8 @@ export INPUTFILEBASE="\$(basename \$INPUTFILE)"
 
 
 # For all files in the output:
-   * add the image name as the first column
-   * remove the ImageNumber column if it exists
+#   * add the image name as the first column
+#   * remove the ImageNumber column if it exists
 # Note: the files are renamed to hardcoded temporary files for simplicity
 for f in output/*.txt ; do 
     # remove carriage returns that are sometimes present
