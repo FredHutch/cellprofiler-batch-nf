@@ -16,7 +16,7 @@ params.file_col = 'FileName_Orig'
 params.shard_col = "Shard_Id"
 params.file_prefix_in = ""
 params.file_prefix_out = ""
-params.version = "4.1.3"
+params.version = "4.2.1"
 
 
 // Docker containers reused across processes
