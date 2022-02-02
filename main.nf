@@ -151,6 +151,7 @@ process CellProfiler {
   container "cellprofiler/cellprofiler:${params.version}"
   label 'mem_veryhigh'
   publishDir path: "${params.output}/tiff/" , mode: 'copy', pattern: "output/*.tiff", overwrite: true
+  publishDir path: "${params.output}/txt/" , mode: 'copy', pattern: "output/*.txt", overwrite: true
 
   input:
     tuple val(shard_id), path("input/*"), path("shard.csv")
