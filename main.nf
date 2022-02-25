@@ -14,14 +14,15 @@ params.group_col = 'Group_Number'
 params.folder_col = 'PathName_Orig'
 params.file_col = 'FileName_Orig'
 params.shard_col = "Shard_Id"
+params.experiment_file = 'Experiment.txt'
+params.nan_value = "nan"
 params.file_prefix_in = ""
 params.file_prefix_out = ""
 params.version = "4.1.3"
 
-
 // Docker containers reused across processes
-container__cellprofiler = "cellprofiler/cellprofiler:${params.version}"
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+params.container_cellprofiler = "cellprofiler/cellprofiler:${params.version}"
+params.container_pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 
 
 // Function which prints help message text
@@ -49,6 +50,11 @@ def helpMessage() {
                                that needs to be changed (no default, ignored when empty)
       --file_prefix_out     When using --file_prefix_in, set this to be the value of the folder path
                                to change into
+      --container_cellprofiler The location of a Docker container that has CellProfiler. This can be used
+                            to run containers that have CellProfiler and additional software (e.g. cellpose)
+                               (default: cellprofiler/cellprofiler:{version})
+      --container_pandas    The location of a Docker container to use that has pandas
+                               (default: quay.io/fhcrc-microbiome/python-pandas:v1.0.3)
 
     CellProfiler Citations: See https://cellprofiler.org/citations
     Workflow: https://github.com/FredHutch/cellprofiler-batch-nf
@@ -94,7 +100,7 @@ workflow {
 
     // Join the CSV and files together
     csv_and_files = files_by_shard.join(csv_by_shard)
-      //.view()
+      .view()
 
     // For each of those batches/shards, run the indicated analysis
     CellProfiler(
@@ -102,38 +108,22 @@ workflow {
       input_h5
     )
 
-    // Take the resulting files, split & group them by name
-    // Use the size and remainder arguments in groupTuple()
-    // to control the size of the inputs to the concat() process
-    profiler_results_ch = CellProfiler.out.txt
-        .flatten()
-        .map({ i -> [ i.name, i ]})
-        .groupTuple(size: params.concat_n , remainder: true)
+    // Get the list of files per shard and associate them with a tuple
+    cellprofiler_out_by_shard = CellProfiler.out
+      .view()
 
-    // For each group of files, concatenate them together
-    ConcatFiles_Round1(
-        profiler_results_ch
-      )
-
-    // Take the results from the first round of concatenation,
-    // group them by name, so they can all be concatenated together
-    concat_ch = ConcatFiles_Round1.out
-        .flatten()
-        .map({ i -> [ i.name, i ]})
-        .groupTuple()
-
-    // Concatenate all files of the same name together
-    ConcatFiles_Round2(
-        concat_ch
+    Format_CellProfiler_Output(
+      cellprofiler_out_by_shard
       )
 
 }
 
 
 process ParseCsv {
-  container "$container__pandas"
+  container "$params.container_pandas"
   label 'io_limited'
   publishDir path: "${params.output}/csv/" , mode: 'copy', pattern: "*.csv", overwrite: true
+  echo true
 
   input:
     path("input/*")
@@ -148,18 +138,17 @@ process ParseCsv {
 
 
 process CellProfiler {
-  container "cellprofiler/cellprofiler:${params.version}"
+  container "$params.container_cellprofiler"
   label 'mem_veryhigh'
   publishDir path: "${params.output}/tiff/" , mode: 'copy', pattern: "output/*.tiff", overwrite: true
-  publishDir path: "${params.output}/txt/" , mode: 'copy', pattern: "output/*.txt", overwrite: true
+  echo true
 
   input:
     tuple val(shard_id), path("input/*"), path("shard.csv")
     path analysis_h5
 
   output:
-    path "output/*.tiff", emit: tiff
-    path "output/*.txt", emit: txt
+    path "output/**"
 
   script:
   """#!/bin/bash
@@ -167,47 +156,33 @@ mkdir -p output
 
 # Run CellProfiler on this batch of images
 cellprofiler -r -c -o output/ -i input/ -p ${analysis_h5} --data-file shard.csv output/OUTPUT
-
-
-# Remove the Experiment file
-# Note: this seems fragile, relying on Experiment.txt. 
-#       Check for all non-tabular results instead?
-#       Maybe move the non-tabular results to a separate output folder,
-#       take the first result, and publish the result?
-REMOVE_FILE="\$(ls output/* | grep Experiment.txt)"
-rm \$REMOVE_FILE
-
-# Get the name of the input image file
-export INPUTFILE="\$(ls input/* | head -n 1)"
-export INPUTFILEBASE="\$(basename \$INPUTFILE)"
-
-
-# For all files in the output:
-#   * add the image name as the first column
-#   * remove the ImageNumber column if it exists
-# Note: the files are renamed to hardcoded temporary files for simplicity
-for f in output/*.txt ; do 
-    # remove carriage returns that are sometimes present
-    cat \$f | tr -d '\\r' > output/tmptrimfile
-    # remove the ImageNumber column if it exists
-    imagenumbercol="\$(head -1 output/tmptrimfile | tr '\\t' '\\n' | cat -n | grep 'ImageNumber' | awk '{print \$1}')"
-    if [[ ! -z "\$imagenumbercol" ]]
-    then
-        cut --complement -f\$imagenumbercol output/tmptrimfile > output/tmpcolfile
-    else
-        cp output/tmptrimfile output/tmpcolfile
-    fi
-    # add the image name column w/ header
-    awk -v f=\$INPUTFILEBASE 'NR==1 {printf("%s\\t%s\\n", "ImageName", \$0)}  NR>1 && NF > 0 { printf("%s\\t%s\\n", f, \$0) }' output/tmpcolfile > output/tmpcopyfile
-    cp output/tmpcopyfile \$f
-    rm -f output/tmpcopyfile output/tmptrimfile output/tmpcolfile
-    unset imagenumbercol
-done
+cp shard.csv output/
+echo "$shard_id" > output/$shard_id
   """
 }
 
+
+process Format_CellProfiler_Output {
+  publishDir path: "${params.output}/txt/" , mode: 'copy', pattern: "*.txt", overwrite: true
+  container "$params.container_pandas"
+  label 'mem_medium'
+  echo true
+
+  input:
+    path("*")
+
+  output:
+    path "*.txt", emit: txt
+    path "**", emit: all
+
+  script:
+    // Run the script in templates/format_cellprofiler_output.py
+    template "format_cellprofiler_output.py"
+
+}
+
 process ConcatFiles_Round1 {
-  container "cellprofiler/cellprofiler:${params.version}"
+  container "$params.container_cellprofiler"
   label 'mem_medium'
 
   input:
@@ -227,7 +202,7 @@ awk 'FNR>1' input*/* >> $filename
 }
 
 process ConcatFiles_Round2 {
-  container "cellprofiler/cellprofiler:${params.version}"
+  container "$params.container_cellprofiler"
   // mode: copy because the default is symlink to /fh/scratch/ (i.e. ephemeral)
   publishDir path: params.output , mode: 'copy'
   label 'mem_medium'
