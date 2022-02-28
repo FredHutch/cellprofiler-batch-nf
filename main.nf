@@ -18,7 +18,7 @@ params.experiment_file = 'Experiment.txt'
 params.nan_value = "nan"
 params.file_prefix_in = ""
 params.file_prefix_out = ""
-params.version = "4.1.3"
+params.version = "4.2.1"
 
 // Docker containers reused across processes
 params.container_cellprofiler = "cellprofiler/cellprofiler:${params.version}"
@@ -40,7 +40,7 @@ def helpMessage() {
     Optional Arguments:
       --n                   Number of images to analyze in each batch (default: 1000)
       --concat_n            Number of tabular results to combine/concatenate in the first round (default: 100)
-      --version             Software version CellProfiler (default: 4.1.3)
+      --version             Software version CellProfiler (default: 4.2.1)
                             Must correspond to tag available at hub.docker.com/r/cellprofiler/cellprofiler/tags
       --group_col           The name of the grouping column in the CSV file (default: Group_Number)
       --folder_col          The name of the folder column in the CSV file (default: PathName_Orig)
@@ -172,16 +172,17 @@ process CellProfiler {
     path analysis_h5
 
   output:
-    path "output/**"
+    tuple val(shard_id), path("output/**")
 
   script:
   """#!/bin/bash
+set -Eeuo pipefail
+
 mkdir -p output
 
 # Run CellProfiler on this batch of images
 cellprofiler -r -c -o output/ -i input/ -p ${analysis_h5} --data-file shard.csv output/OUTPUT
 cp shard.csv output/
-echo "$shard_id" > output/$shard_id
   """
 }
 
@@ -193,7 +194,7 @@ process Format_CellProfiler_Output {
   label 'mem_medium'
 
   input:
-    path("input/*")
+    tuple val(shard_id), path("input/*")
 
   output:
     path "*.txt", emit: txt
@@ -215,6 +216,8 @@ process ConcatFiles_Round1 {
     path "$filename"
 
   """#!/bin/bash
+set -Eeuo pipefail
+
 # first, save the header
 FIRSTFILE="\$(ls input*/* | head -n 1)"
 head -n 1 \$FIRSTFILE > $filename
@@ -238,6 +241,8 @@ process ConcatFiles_Round2 {
     path "$filename"
 
   """#!/bin/bash
+set -Eeuo pipefail
+
 # first, save the header
 FIRSTFILE="\$(ls input*/* | head -n 1)"
 head -n 1 \$FIRSTFILE > $filename
