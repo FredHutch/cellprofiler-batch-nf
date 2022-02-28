@@ -51,10 +51,12 @@ def helpMessage() {
       --file_prefix_out     When using --file_prefix_in, set this to be the value of the folder path
                                to change into
       --container_cellprofiler The location of a Docker container that has CellProfiler. This can be used
-                            to run containers that have CellProfiler and additional software (e.g. cellpose)
+                               to run containers that have CellProfiler and additional software (e.g. cellpose)
                                (default: cellprofiler/cellprofiler:{version})
       --container_pandas    The location of a Docker container to use that has pandas
                                (default: quay.io/fhcrc-microbiome/python-pandas:v1.0.3)
+      --nan_value           When reformatting the .txt files, this is what gets put in place of 'NA' or 'NaN' values
+                               (default: 'nan')
 
     CellProfiler Citations: See https://cellprofiler.org/citations
     Workflow: https://github.com/FredHutch/cellprofiler-batch-nf
@@ -100,7 +102,7 @@ workflow {
 
     // Join the CSV and files together
     csv_and_files = files_by_shard.join(csv_by_shard)
-      .view()
+      //.view()
 
     // For each of those batches/shards, run the indicated analysis
     CellProfiler(
@@ -110,10 +112,34 @@ workflow {
 
     // Get the list of files per shard and associate them with a tuple
     cellprofiler_out_by_shard = CellProfiler.out
-      .view()
 
     Format_CellProfiler_Output(
       cellprofiler_out_by_shard
+      )
+
+    // Take the resulting files, split & group them by name
+    // Use the size and remainder arguments in groupTuple()
+    // to control the size of the inputs to the concat() process
+    profiler_results_ch = Format_CellProfiler_Output.out.txt
+        .flatten()
+        .map({ i -> [ i.name, i ]})
+        .groupTuple(size: params.concat_n , remainder: true)
+
+    // For each group of files, concatenate them together
+    ConcatFiles_Round1(
+        profiler_results_ch
+      )
+
+    // Take the results from the first round of concatenation,
+    // group them by name, so they can all be concatenated together
+    concat_ch = ConcatFiles_Round1.out
+        .flatten()
+        .map({ i -> [ i.name, i ]})
+        .groupTuple()
+
+    // Concatenate all files of the same name together
+    ConcatFiles_Round2(
+        concat_ch
       )
 
 }
@@ -121,9 +147,8 @@ workflow {
 
 process ParseCsv {
   container "$params.container_pandas"
-  label 'io_limited'
   publishDir path: "${params.output}/csv/" , mode: 'copy', pattern: "*.csv", overwrite: true
-  echo true
+  label 'io_limited'
 
   input:
     path("input/*")
@@ -133,15 +158,14 @@ process ParseCsv {
     //name them by group number
 
   script:
-  template 'parse_csv.py'
+    template 'parse_csv.py'
 }
 
 
 process CellProfiler {
   container "$params.container_cellprofiler"
-  label 'mem_veryhigh'
   publishDir path: "${params.output}/tiff/" , mode: 'copy', pattern: "output/*.tiff", overwrite: true
-  echo true
+  label 'mem_veryhigh'
 
   input:
     tuple val(shard_id), path("input/*"), path("shard.csv")
@@ -163,23 +187,22 @@ echo "$shard_id" > output/$shard_id
 
 
 process Format_CellProfiler_Output {
-  publishDir path: "${params.output}/txt/" , mode: 'copy', pattern: "*.txt", overwrite: true
   container "$params.container_pandas"
+  // mode: copy because the default is symlink to /fh/scratch/ (i.e. ephemeral)
+  publishDir path: "${params.output}/txt/" , mode: 'copy', pattern: "*.txt", overwrite: true
   label 'mem_medium'
-  echo true
 
   input:
-    path("*")
+    path("input/*")
 
   output:
     path "*.txt", emit: txt
     path "**", emit: all
 
   script:
-    // Run the script in templates/format_cellprofiler_output.py
     template "format_cellprofiler_output.py"
-
 }
+
 
 process ConcatFiles_Round1 {
   container "$params.container_cellprofiler"
@@ -200,6 +223,7 @@ head -n 1 \$FIRSTFILE > $filename
 awk 'FNR>1' input*/* >> $filename
   """
 }
+
 
 process ConcatFiles_Round2 {
   container "$params.container_cellprofiler"

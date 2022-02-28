@@ -30,8 +30,8 @@ def parse_and_convert_tsv(shard_df,
 
 if __name__ == "__main__":
     shard_csv_file = "shard.csv"
-    shard_id = [x for x in os.listdir('.') if x.isdigit()][0]
-    input_dir = '.'
+    input_dir = 'input'
+    shard_id = [x for x in os.listdir(input_dir) if x.isdigit()][0]
     
     join_config = {'*Image.txt': ['Group_Index']
                    # '*Nuclei.txt': ['FileName_Orig', 'PathName_Orig']
@@ -41,12 +41,12 @@ if __name__ == "__main__":
     if os.path.exists(file_to_remove):
         os.remove(file_to_remove)
 
-    shard_df = pd.read_csv(shard_csv_file)
+    shard_df = pd.read_csv(os.path.join(input_dir, shard_csv_file))
 
     for path, col_mapping in join_config.items():
         for file in glob.glob(os.path.join(input_dir, path)):
-            print(f"Processing {file} , per {path}")
+            print(f"Processing {file} per {path} (shard {shard_id})")
             parse_and_convert_tsv(shard_df=shard_df,
                                   source_file=file,
-                                  destination_file=f"{shard_id}-{file}",
+                                  destination_file=f"{os.path.basename(file)}",
                                   join_cols=col_mapping)
