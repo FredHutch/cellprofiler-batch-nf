@@ -8,17 +8,6 @@ params.help = false
 params.input_h5 = false
 params.input_csv = false
 params.output = false
-params.n = 1000
-params.concat_n = 100
-params.group_col = 'Group_Number'
-params.folder_col = 'PathName_Orig'
-params.file_col = 'FileName_Orig'
-params.shard_col = "Shard_Id"
-params.experiment_file = 'Experiment.txt'
-params.nan_value = "nan"
-params.file_prefix_in = ""
-params.file_prefix_out = ""
-params.version = "4.2.1"
 
 // Docker containers reused across processes
 params.container_cellprofiler = "cellprofiler/cellprofiler:${params.version}"
