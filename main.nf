@@ -8,20 +8,9 @@ params.help = false
 params.input_h5 = false
 params.input_csv = false
 params.output = false
-params.n = 1000
-params.concat_n = 100
-params.group_col = 'Group_Number'
-params.folder_col = 'PathName_Orig'
-params.file_col = 'FileName_Orig'
-params.shard_col = "Shard_Id"
-params.file_prefix_in = ""
-params.file_prefix_out = ""
-params.version = "4.2.1"
-
-
 // Docker containers reused across processes
-container__cellprofiler = "cellprofiler/cellprofiler:${params.version}"
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+params.container_cellprofiler = "cellprofiler/cellprofiler:${params.version}"
+params.container_pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 
 
 // Function which prints help message text
@@ -39,7 +28,7 @@ def helpMessage() {
     Optional Arguments:
       --n                   Number of images to analyze in each batch (default: 1000)
       --concat_n            Number of tabular results to combine/concatenate in the first round (default: 100)
-      --version             Software version CellProfiler (default: 4.1.3)
+      --version             Software version CellProfiler (default: 4.2.1)
                             Must correspond to tag available at hub.docker.com/r/cellprofiler/cellprofiler/tags
       --group_col           The name of the grouping column in the CSV file (default: Group_Number)
       --folder_col          The name of the folder column in the CSV file (default: PathName_Orig)
@@ -49,6 +38,13 @@ def helpMessage() {
                                that needs to be changed (no default, ignored when empty)
       --file_prefix_out     When using --file_prefix_in, set this to be the value of the folder path
                                to change into
+      --container_cellprofiler The location of a Docker container that has CellProfiler. This can be used
+                               to run containers that have CellProfiler and additional software (e.g. cellpose)
+                               (default: cellprofiler/cellprofiler:{version})
+      --container_pandas    The location of a Docker container to use that has pandas
+                               (default: quay.io/fhcrc-microbiome/python-pandas:v1.0.3)
+      --nan_value           When reformatting the .txt files, this is what gets put in place of 'NA' or 'NaN' values
+                               (default: 'nan')
 
     CellProfiler Citations: See https://cellprofiler.org/citations
     Workflow: https://github.com/FredHutch/cellprofiler-batch-nf
@@ -102,10 +98,17 @@ workflow {
       input_h5
     )
 
+    // Get the list of files per shard and associate them with a tuple
+    cellprofiler_out_by_shard = CellProfiler.out
+
+    Format_CellProfiler_Output(
+      cellprofiler_out_by_shard
+      )
+
     // Take the resulting files, split & group them by name
     // Use the size and remainder arguments in groupTuple()
     // to control the size of the inputs to the concat() process
-    profiler_results_ch = CellProfiler.out.txt
+    profiler_results_ch = Format_CellProfiler_Output.out.txt
         .flatten()
         .map({ i -> [ i.name, i ]})
         .groupTuple(size: params.concat_n , remainder: true)
@@ -131,9 +134,9 @@ workflow {
 
 
 process ParseCsv {
-  container "$container__pandas"
-  label 'io_limited'
+  container "$params.container_pandas"
   publishDir path: "${params.output}/csv/" , mode: 'copy', pattern: "*.csv", overwrite: true
+  label 'io_limited'
 
   input:
     path("input/*")
@@ -143,71 +146,55 @@ process ParseCsv {
     //name them by group number
 
   script:
-  template 'parse_csv.py'
+    template 'parse_csv.py'
 }
 
 
 process CellProfiler {
-  container "cellprofiler/cellprofiler:${params.version}"
-  label 'mem_veryhigh'
+  container "$params.container_cellprofiler"
   publishDir path: "${params.output}/tiff/" , mode: 'copy', pattern: "output/*.tiff", overwrite: true
-  publishDir path: "${params.output}/txt/" , mode: 'copy', pattern: "output/*.txt", overwrite: true
+  label 'mem_veryhigh'
 
   input:
     tuple val(shard_id), path("input/*"), path("shard.csv")
     path analysis_h5
 
   output:
-    path "output/*.tiff", emit: tiff
-    path "output/*.txt", emit: txt
+    tuple val(shard_id), path("output/**")
 
   script:
   """#!/bin/bash
+set -Eeuo pipefail
+
 mkdir -p output
 
 # Run CellProfiler on this batch of images
 cellprofiler -r -c -o output/ -i input/ -p ${analysis_h5} --data-file shard.csv output/OUTPUT
-
-
-# Remove the Experiment file
-# Note: this seems fragile, relying on Experiment.txt. 
-#       Check for all non-tabular results instead?
-#       Maybe move the non-tabular results to a separate output folder,
-#       take the first result, and publish the result?
-REMOVE_FILE="\$(ls output/* | grep Experiment.txt)"
-rm \$REMOVE_FILE
-
-# Get the name of the input image file
-export INPUTFILE="\$(ls input/* | head -n 1)"
-export INPUTFILEBASE="\$(basename \$INPUTFILE)"
-
-
-# For all files in the output:
-#   * add the image name as the first column
-#   * remove the ImageNumber column if it exists
-# Note: the files are renamed to hardcoded temporary files for simplicity
-for f in output/*.txt ; do 
-    # remove carriage returns that are sometimes present
-    cat \$f | tr -d '\\r' > output/tmptrimfile
-    # remove the ImageNumber column if it exists
-    imagenumbercol="\$(head -1 output/tmptrimfile | tr '\\t' '\\n' | cat -n | grep 'ImageNumber' | awk '{print \$1}')"
-    if [[ ! -z "\$imagenumbercol" ]]
-    then
-        cut --complement -f\$imagenumbercol output/tmptrimfile > output/tmpcolfile
-    else
-        cp output/tmptrimfile output/tmpcolfile
-    fi
-    # add the image name column w/ header
-    awk -v f=\$INPUTFILEBASE 'NR==1 {printf("%s\\t%s\\n", "ImageName", \$0)}  NR>1 && NF > 0 { printf("%s\\t%s\\n", f, \$0) }' output/tmpcolfile > output/tmpcopyfile
-    cp output/tmpcopyfile \$f
-    rm -f output/tmpcopyfile output/tmptrimfile output/tmpcolfile
-    unset imagenumbercol
-done
+cp shard.csv output/
   """
 }
 
+
+process Format_CellProfiler_Output {
+  container "$params.container_pandas"
+  // mode: copy because the default is symlink to /fh/scratch/ (i.e. ephemeral)
+  publishDir path: "${params.output}/txt/" , mode: 'copy', pattern: "*.txt", overwrite: true
+  label 'mem_medium'
+
+  input:
+    tuple val(shard_id), path("input/*")
+
+  output:
+    path "*.txt", emit: txt
+    path "**", emit: all
+
+  script:
+    template "format_cellprofiler_output.py"
+}
+
+
 process ConcatFiles_Round1 {
-  container "cellprofiler/cellprofiler:${params.version}"
+  container "$params.container_cellprofiler"
   label 'mem_medium'
 
   input:
@@ -217,6 +204,8 @@ process ConcatFiles_Round1 {
     path "$filename"
 
   """#!/bin/bash
+set -Eeuo pipefail
+
 # first, save the header
 FIRSTFILE="\$(ls input*/* | head -n 1)"
 head -n 1 \$FIRSTFILE > $filename
@@ -226,8 +215,9 @@ awk 'FNR>1' input*/* >> $filename
   """
 }
 
+
 process ConcatFiles_Round2 {
-  container "cellprofiler/cellprofiler:${params.version}"
+  container "$params.container_cellprofiler"
   // mode: copy because the default is symlink to /fh/scratch/ (i.e. ephemeral)
   publishDir path: params.output , mode: 'copy'
   label 'mem_medium'
@@ -239,6 +229,8 @@ process ConcatFiles_Round2 {
     path "$filename"
 
   """#!/bin/bash
+set -Eeuo pipefail
+
 # first, save the header
 FIRSTFILE="\$(ls input*/* | head -n 1)"
 head -n 1 \$FIRSTFILE > $filename
