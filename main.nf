@@ -8,7 +8,6 @@ params.help = false
 params.input_h5 = false
 params.input_csv = false
 params.output = false
-
 // Docker containers reused across processes
 params.container_cellprofiler = "cellprofiler/cellprofiler:${params.version}"
 params.container_pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
