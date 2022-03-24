@@ -3,12 +3,6 @@
 // Using DSL-2
 nextflow.enable.dsl=2
 
-// Set default parameters
-params.help = false
-params.input_h5 = false
-params.input_csv = false
-params.output = false
-
 
 // Function which prints help message text
 def helpMessage() {
