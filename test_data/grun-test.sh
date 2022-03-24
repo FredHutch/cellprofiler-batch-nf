@@ -1,6 +1,8 @@
 #!/bin/bash
 # GROUPING TEST RUN
 
+set -e
+
 # WORKING DIRECTORY
 # Go to the working directory, where you have the .cppipe pipeline file and the CSV file created by CellProfiler
 
