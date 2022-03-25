@@ -3,15 +3,6 @@
 // Using DSL-2
 nextflow.enable.dsl=2
 
-// Set default parameters
-params.help = false
-params.input_h5 = false
-params.input_csv = false
-params.output = false
-// Docker containers reused across processes
-params.container_cellprofiler = "cellprofiler/cellprofiler:${params.version}"
-params.container_pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
-
 
 // Function which prints help message text
 def helpMessage() {
@@ -74,7 +65,7 @@ workflow {
     )
 
     // Get the list of files per shard and associate them with a tuple
-    files_by_shard = ParseCsv.out
+    files_by_shard = ParseCsv.out.shard
       .flatMap()
       .splitCsv(header: true)
       .map { it -> [it.Shard_Id, file( it.Wf_Image_Path )] }
@@ -82,7 +73,7 @@ workflow {
       //.view()
 
     // Get the csv file for each shard and associate it with a tuple
-    csv_by_shard = ParseCsv.out
+    csv_by_shard = ParseCsv.out.csv
       .flatMap()
       .map { it -> [file(it).getName().replace('.csv',''), file(it)] }
       .groupTuple()
@@ -142,8 +133,9 @@ process ParseCsv {
     path("input/*")
 
   output:
-    path("*.csv")
-    //name them by group number
+    path("shards/*.csv"), emit: shard
+    path("*.csv"), emit: csv
+    //name them by shard number
 
   script:
     template 'parse_csv.py'

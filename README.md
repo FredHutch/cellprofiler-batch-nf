@@ -189,3 +189,15 @@ We do this by processing the CSV, identifying groups, and assigning all of image
 ## CellProfiler pipelines
 
 The workflow requires a CellProfiler pipeline (`.cppipe`) file. This can be created from a project by going to *File -> Export -> Pipeline*. See the [CellProfiler manual](https://cellprofiler-manual.s3.amazonaws.com/CellProfiler-4.1.3/help/projects_introduction.html?highlight=cppipe#) for details. Look for the 'Saving a project' section.
+
+
+
+# Testing
+
+Currently we have 3 tests, one for each 'mode' of the workflow. The scripts are in the `test_data` folder.
+
+| Test | Script | CSV |
+|--|--|--|
+| Simple (no groups or multichannels) | `run-test.sh` | `simple.csv` |
+| Grouping | `grun-test.sh` | `grouping.csv` |
+| Multichannel | `mrun-test.sh` | `multich.csv` |

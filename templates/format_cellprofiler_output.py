@@ -30,7 +30,9 @@ def parse_and_convert_tsv(shard_df,
     file_df = pd.read_csv(source_file, sep=col_separator)
     
     # we want to add in only the 'cols_to_copy' to the resulting TSV/CSV file
-    cols_to_join = join_cols + cols_to_copy
+    # Make sure the columns in cols_to_copy are in the dataframe, otherwise exclude them
+    valid_cols_to_copy = [x for x in cols_to_copy if x in file_df.columns]
+    cols_to_join = join_cols + valid_cols_to_copy
 
     # pd.merge() does most of the work. We're doing a left join to avoid filtering any records
     # if shard_df doesn't have all of the entries
