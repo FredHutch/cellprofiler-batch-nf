@@ -14,7 +14,8 @@ cols_to_copy = ["${params.file_col}"]
 shard_id = "${shard_id}"
 shard_csv_file = "shard.csv"
 input_dir = 'input'
-join_config = {'*Image.txt': ['Group_Index']
+join_config = {'*Image.txt': ['Group_Index'],
+               '*Image.csv': ['Group_Index']
                # '*Nuclei.txt': ['FileName_Orig', 'PathName_Orig']
                }
 
