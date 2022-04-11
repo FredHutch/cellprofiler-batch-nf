@@ -58,6 +58,7 @@ if __name__ == "__main__":
     # and join them with the shard CSV
     # col_mapping is a list of columns to join on (must have the same name in both files)
     files_processed = []
+
     for path, col_mapping in join_config.items():
         for file in glob.glob(os.path.join(input_dir, path)):
             print(f"Processing {file} per {path} (shard {shard_id})")
@@ -70,7 +71,7 @@ if __name__ == "__main__":
     # now copy files that haven't been processed, if they are of valid types
     potential_files_to_copy = []
     for copy_pattern in file_types_to_copy:
-        potential_files_to_copy.extend(glob.glob(os.path.join(input_dir, copy_pattern))
+        potential_files_to_copy.extend(glob.glob(os.path.join(input_dir, copy_pattern)))
 
     for file in potential_files_to_copy:
         if file not in files_processed:
