@@ -5,6 +5,7 @@ import csv
 import glob
 import sys
 import pandas as pd
+import shutil
 
 
 # static variables
@@ -18,6 +19,7 @@ join_config = {'*Image.txt': ['Group_Index'],
                '*Image.csv': ['Group_Index']
                # '*Nuclei.txt': ['FileName_Orig', 'PathName_Orig']
                }
+file_types_to_copy = ['*.csv', '*.tsv', '*.txt']
 
 
 # this method
@@ -55,10 +57,22 @@ if __name__ == "__main__":
     # for each type of file to process, iterate through the files
     # and join them with the shard CSV
     # col_mapping is a list of columns to join on (must have the same name in both files)
+    files_processed = []
     for path, col_mapping in join_config.items():
         for file in glob.glob(os.path.join(input_dir, path)):
             print(f"Processing {file} per {path} (shard {shard_id})")
+            files_processed.append(file)
             parse_and_convert_tsv(shard_df=shard_df,
                                   source_file=file,
                                   destination_file=f"{os.path.basename(file)}",
                                   join_cols=col_mapping)
+
+    # now copy files that haven't been processed, if they are of valid types
+    potential_files_to_copy = []
+    for copy_pattern in file_types_to_copy:
+        potential_files_to_copy.extend(glob.glob(os.path.join(input_dir, copy_pattern))
+
+    for file in potential_files_to_copy:
+        if file not in files_processed:
+            print(f"Copying file {file} to . so it will be propagated")
+        shutil.copy(file, os.path.basename(file))
