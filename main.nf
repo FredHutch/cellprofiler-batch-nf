@@ -99,7 +99,7 @@ workflow {
     // Take the resulting files, split & group them by name
     // Use the size and remainder arguments in groupTuple()
     // to control the size of the inputs to the concat() process
-    profiler_results_ch = Format_CellProfiler_Output.out.txt
+    profiler_results_ch = Format_CellProfiler_Output.out.all
         .flatten()
         .map({ i -> [ i.name, i ]})
         .groupTuple(size: params.concat_n , remainder: true)
@@ -170,14 +170,13 @@ cp shard.csv output/
 process Format_CellProfiler_Output {
   container "$params.container_pandas"
   // mode: copy because the default is symlink to /fh/scratch/ (i.e. ephemeral)
-  publishDir path: "${params.output}/txt/" , mode: 'copy', pattern: "*.txt", overwrite: true
+  publishDir path: "${params.output}/txt/" , mode: 'copy', overwrite: true
   label 'mem_medium'
 
   input:
     tuple val(shard_id), path("input/*")
 
   output:
-    path "*.txt", emit: txt
     path "**", emit: all
 
   script:
