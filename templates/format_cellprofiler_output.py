@@ -8,7 +8,7 @@ import pandas as pd
 
 
 # static variables
-col_separator = '\t'
+col_separator = "${params.col_separator}"
 na_rep = "${params.nan_value}"
 cols_to_copy = ["${params.file_col}"]
 shard_id = "${shard_id}"
