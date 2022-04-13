@@ -113,7 +113,7 @@ def parse_and_convert_csv(src_file):
         # across multiple columns in the multichannel runs, leading to 
         # duplicate identical file entries (which breaks NF)
         shard_df = unpivot[unpivot[shard_col] == shard].drop_duplicates()
-        shard_df[[shard_col, 'Wf_Image_Path']].to_csv(f"shards/{shard}.csv", index=False)
+        shard_df[[shard_col, 'Wf_Image_Path']].drop_duplicates().to_csv(f"shards/{shard}.csv", index=False)
 
 
 if __name__ == "__main__":
